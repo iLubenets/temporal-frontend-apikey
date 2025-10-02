@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+
+# Test cluster
+test-docker-compose
+
+# Environment
+.env
+
+# Build artifacts
+temporal-apikey
+temporal-server
+
+# OS
+.DS_Store
+*.log

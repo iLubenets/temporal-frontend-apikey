@@ -1,0 +1,27 @@
+# Binaries
+temporal-apikey
+temporal-server
+test-client
+
+# Go
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+
+# Docker
+*.log
+
+# OS
+.DS_Store

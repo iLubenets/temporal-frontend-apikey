@@ -1,0 +1,205 @@
+version: "3.5"
+
+services:
+  postgresql:
+    container_name: temporal-postgresql
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-temporal}
+      POSTGRES_USER: ${POSTGRES_USER:-temporal}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - temporal-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch:
+    container_name: temporal-elasticsearch
+    image: elasticsearch:${ELASTICSEARCH_VERSION:-7.16.2}
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms256m -Xmx512m
+      - xpack.security.enabled=false
+    expose:
+      - 9200
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - temporal-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  temporal-history:
+    container_name: temporal-history
+    image: temporalio/auto-setup:${TEMPORAL_VERSION:-1.28.1}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SERVICES=history
+      - ENABLE_ES=true
+      - ES_SEEDS=elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - temporal-network
+
+  temporal-matching:
+    container_name: temporal-matching
+    image: temporalio/server:${TEMPORAL_VERSION:-1.28.1}
+    depends_on:
+      - temporal-history
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SERVICES=matching
+      - ENABLE_ES=true
+      - ES_SEEDS=elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - temporal-network
+
+  # Single frontend instance with custom API key authentication
+  temporal-frontend-external:
+    container_name: temporal-frontend-external
+    image: temporal-frontend-apikey:${TEMPORAL_VERSION:-1.28.1}
+    depends_on:
+      - temporal-matching
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SERVICES=frontend
+      - ENABLE_ES=true
+      - ES_SEEDS=elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+      # Custom config
+      - TEMPORAL_ENVIRONMENT=docker
+      - TEMPORAL_CONFIG_DIR=/config
+      # API Key Authentication
+      - TEMPORAL_API_KEYS=${TEMPORAL_API_KEYS:-admin-key:admin:*;test-key:service:default}
+    ports:
+      - "7233:7233"  # gRPC endpoint with API key protection
+    volumes:
+      - ./config-docker.yaml:/config/docker.yaml:ro  # Mount config file
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - temporal-network
+    restart: on-failure
+
+  temporal-frontend-internal:
+    container_name: temporal-frontend-internal
+    image: temporalio/server:${TEMPORAL_VERSION:-1.28.1}
+    depends_on:
+      - temporal-matching
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SERVICES=frontend
+      - ENABLE_ES=true
+      - ES_SEEDS=elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+    #ports:
+      #- "7233:7233"  # gRPC endpoint with API key protection
+    volumes:
+      - ./config-docker.yaml:/config/docker.yaml:ro  # Mount config file
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - temporal-network
+    restart: on-failure
+
+  temporal-worker:
+    container_name: temporal-worker
+    image: temporalio/server:${TEMPORAL_VERSION:-1.28.1}
+    depends_on:
+      - temporal-frontend-internal
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-temporal}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-temporal}
+      - POSTGRES_SEEDS=postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/development-sql.yaml
+      - SERVICES=worker
+      - PUBLIC_FRONTEND_ADDRESS=temporal-frontend-internal:7233
+      - ENABLE_ES=true
+      - ES_SEEDS=elasticsearch
+      - ES_VERSION=v7
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig
+    networks:
+      - temporal-network
+
+  # Temporal Web UI (connects directly to frontend)
+  temporal-ui:
+    container_name: temporal-ui
+    image: temporalio/ui:${TEMPORAL_UI_VERSION:-2.35.0}
+    depends_on:
+      - temporal-frontend-internal
+    environment:
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:3000,http://localhost:8080
+    ports:
+      - "8080:8080"  # Web UI accessible at http://localhost:8080
+    networks:
+      - temporal-network
+
+  # Admin tools for CLI access (requires API key via environment)
+  temporal-admin-tools:
+    container_name: temporal-admin-tools
+    image: temporalio/admin-tools:${TEMPORAL_ADMINTOOLS_VERSION:-1.28.1-tctl-1.18.1-cli-1.1.1}
+    depends_on:
+      - temporal-frontend-internal
+    environment:
+      - TEMPORAL_ADDRESS=temporal-frontend-internal:7233
+    stdin_open: true
+    tty: true
+    networks:
+      - temporal-network
+    profiles:
+      - admin  # Start with: docker compose --profile admin up
+
+volumes:
+  postgres-data:
+  elasticsearch-data:
+
+networks:
+  temporal-network:
+    driver: bridge
+    name: temporal-network
