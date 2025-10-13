@@ -2,10 +2,7 @@ module github.com/ilubenets/temporal-apikey
 
 go 1.25
 
-require (
-	go.temporal.io/sdk v1.34.0
-	go.temporal.io/server v1.28.1
-)
+require go.temporal.io/server v1.28.1
 
 require (
 	cel.dev/expr v0.20.0 // indirect
@@ -120,6 +117,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.5.0 // indirect
 	go.temporal.io/api v1.50.1 // indirect
+	go.temporal.io/sdk v1.34.0 // indirect
 	go.temporal.io/version v0.3.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/dig v1.18.0 // indirect

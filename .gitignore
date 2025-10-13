@@ -2,6 +2,7 @@
 temporal-apikey
 temporal-server
 test-client
+bin/
 
 # Go
 *.so

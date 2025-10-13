@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/ilubenets/temporal-apikey/src/authorizer"
 	"go.temporal.io/server/common/authorization"
 	"go.temporal.io/server/common/config"
 	logpkg "go.temporal.io/server/common/log"
@@ -34,12 +35,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// custom API-KEY config
-	apiKeys := os.Getenv("TEMPORAL_API_KEYS")
-	if apiKeys == "" {
-		log.Fatal(err)
-	}
-	mapper, err := NewAPIKeyClaimMapper(apiKeys, logger)
+	// custom API-KEY auth
+	mapper, err := authorizer.NewAPIKeyClaimMapper(logger)
 	if err != nil {
 		log.Fatal(err)
 	}
