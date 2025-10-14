@@ -2,7 +2,8 @@
 ARG TEMPORAL_VERSION=1.28.1
 
 # Build stage - compile custom temporal with API key auth
-FROM golang:1.25 AS builder
+# Use native platform for builder (fast) and cross-compile for target
+FROM --platform=$BUILDPLATFORM golang:1.25 AS builder
 
 # Docker BuildKit provides these automatically for multiarch builds
 ARG TARGETOS
