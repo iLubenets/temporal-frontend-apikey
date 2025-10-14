@@ -8,16 +8,20 @@ import (
 	"go.temporal.io/server/common/authorization"
 )
 
+// APIKeyConfig manages API key to claims mappings loaded from environment variables.
 type APIKeyConfig struct {
 	keys map[string]*authorization.Claims
 }
 
-func NewApiKeyConfig() *APIKeyConfig {
+// NewAPIKeyConfig creates a new APIKeyConfig instance with an empty key map.
+func NewAPIKeyConfig() *APIKeyConfig {
 	return &APIKeyConfig{
 		keys: make(map[string]*authorization.Claims),
 	}
 }
 
+// LoadEnv loads API keys from TEMPORAL_API_KEYS environment variable.
+// Expected format: "key:role:namespace;key2:role2:namespace2" where role is reader/writer/worker/admin and namespace can be * for system-wide access.
 func (c *APIKeyConfig) LoadEnv() error {
 	// app1-key:writer:app1-namespace
 	apiKeysEnv := os.Getenv("TEMPORAL_API_KEYS")
@@ -54,7 +58,8 @@ func (c *APIKeyConfig) LoadEnv() error {
 	return nil
 }
 
-func (c *APIKeyConfig) GetByApiKey(apiKey string) *authorization.Claims {
+// GetByAPIKey retrieves authorization claims for the given API key, returns nil if not found.
+func (c *APIKeyConfig) GetByAPIKey(apiKey string) *authorization.Claims {
 	if claim, ok := c.keys[apiKey]; ok {
 		return claim
 	}

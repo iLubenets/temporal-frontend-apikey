@@ -28,7 +28,6 @@ jobs:
         uses: golangci/golangci-lint-action@v8
         with:
           version: latest
-          args: --timeout=3m
 
       - name: test
         run: go test -v -timeout=100s -race -coverprofile=coverage.out ./src/...
@@ -73,7 +72,7 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
           file: ./Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

@@ -9,11 +9,11 @@ import (
 	"go.temporal.io/server/common/authorization"
 )
 
-func TestNewApiKeyConfig(t *testing.T) {
-	cfg := NewApiKeyConfig()
+func TestNewAPIKeyConfig(t *testing.T) {
+	cfg := NewAPIKeyConfig()
 	assert.NotNil(t, cfg)
 	assert.NotNil(t, cfg.keys)
-	assert.Equal(t, 0, len(cfg.keys))
+	assert.Empty(t, cfg.keys)
 }
 
 func TestRoleFromString(t *testing.T) {
@@ -60,7 +60,7 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			envValue:     "app1-key:writer:app1-namespace",
 			expectedKeys: 1,
 			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims := cfg.GetByApiKey("app1-key")
+				claims := cfg.GetByAPIKey("app1-key")
 				require.NotNil(t, claims)
 				assert.Equal(t, "app1-key", claims.Subject)
 				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["app1-namespace"])
@@ -72,11 +72,11 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			envValue:     "admin-key:admin:*",
 			expectedKeys: 1,
 			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims := cfg.GetByApiKey("admin-key")
+				claims := cfg.GetByAPIKey("admin-key")
 				require.NotNil(t, claims)
 				assert.Equal(t, "admin-key", claims.Subject)
 				assert.Equal(t, authorization.RoleAdmin, claims.System)
-				assert.Equal(t, 0, len(claims.Namespaces))
+				assert.Empty(t, claims.Namespaces)
 			},
 		},
 		{
@@ -84,15 +84,15 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			envValue:     "key1:reader:ns1;key2:writer:ns2;key3:admin:*",
 			expectedKeys: 3,
 			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims1 := cfg.GetByApiKey("key1")
+				claims1 := cfg.GetByAPIKey("key1")
 				require.NotNil(t, claims1)
 				assert.Equal(t, authorization.RoleReader, claims1.Namespaces["ns1"])
 
-				claims2 := cfg.GetByApiKey("key2")
+				claims2 := cfg.GetByAPIKey("key2")
 				require.NotNil(t, claims2)
 				assert.Equal(t, authorization.RoleWriter, claims2.Namespaces["ns2"])
 
-				claims3 := cfg.GetByApiKey("key3")
+				claims3 := cfg.GetByAPIKey("key3")
 				require.NotNil(t, claims3)
 				assert.Equal(t, authorization.RoleAdmin, claims3.System)
 			},
@@ -102,7 +102,7 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			envValue:     "worker-key:worker:my-namespace",
 			expectedKeys: 1,
 			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims := cfg.GetByApiKey("worker-key")
+				claims := cfg.GetByAPIKey("worker-key")
 				require.NotNil(t, claims)
 				assert.Equal(t, authorization.RoleWorker, claims.Namespaces["my-namespace"])
 			},
@@ -112,10 +112,10 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			envValue:     "  key1:reader:ns1  ;  key2:writer:ns2  ",
 			expectedKeys: 2,
 			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims1 := cfg.GetByApiKey("key1")
+				claims1 := cfg.GetByAPIKey("key1")
 				require.NotNil(t, claims1)
 
-				claims2 := cfg.GetByApiKey("key2")
+				claims2 := cfg.GetByAPIKey("key2")
 				require.NotNil(t, claims2)
 			},
 		},
@@ -126,10 +126,10 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 			os.Setenv("TEMPORAL_API_KEYS", tt.envValue)
 			defer os.Unsetenv("TEMPORAL_API_KEYS")
 
-			cfg := NewApiKeyConfig()
+			cfg := NewAPIKeyConfig()
 			err := cfg.LoadEnv()
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedKeys, len(cfg.keys))
+			assert.Len(t, cfg.keys, tt.expectedKeys)
 
 			if tt.validateClaims != nil {
 				tt.validateClaims(t, cfg)
@@ -186,7 +186,7 @@ func TestAPIKeyConfig_LoadEnv_Error(t *testing.T) {
 			os.Setenv("TEMPORAL_API_KEYS", tt.envValue)
 			defer os.Unsetenv("TEMPORAL_API_KEYS")
 
-			cfg := NewApiKeyConfig()
+			cfg := NewAPIKeyConfig()
 			err := cfg.LoadEnv()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.expectedError)
@@ -194,27 +194,27 @@ func TestAPIKeyConfig_LoadEnv_Error(t *testing.T) {
 	}
 }
 
-func TestAPIKeyConfig_GetByApiKey(t *testing.T) {
+func TestAPIKeyConfig_GetByAPIKey(t *testing.T) {
 	os.Setenv("TEMPORAL_API_KEYS", "key1:reader:ns1;key2:writer:ns2")
 	defer os.Unsetenv("TEMPORAL_API_KEYS")
 
-	cfg := NewApiKeyConfig()
+	cfg := NewAPIKeyConfig()
 	err := cfg.LoadEnv()
 	require.NoError(t, err)
 
 	t.Run("existing key", func(t *testing.T) {
-		claims := cfg.GetByApiKey("key1")
+		claims := cfg.GetByAPIKey("key1")
 		assert.NotNil(t, claims)
 		assert.Equal(t, "key1", claims.Subject)
 	})
 
 	t.Run("non-existing key", func(t *testing.T) {
-		claims := cfg.GetByApiKey("non-existing-key")
+		claims := cfg.GetByAPIKey("non-existing-key")
 		assert.Nil(t, claims)
 	})
 
 	t.Run("empty key", func(t *testing.T) {
-		claims := cfg.GetByApiKey("")
+		claims := cfg.GetByAPIKey("")
 		assert.Nil(t, claims)
 	})
 }

@@ -14,8 +14,9 @@ type APIKeyClaimMapper struct {
 	cfg    *APIKeyConfig
 }
 
+// NewAPIKeyClaimMapper creates a new APIKeyClaimMapper with the given logger and loads API key configuration from environment.
 func NewAPIKeyClaimMapper(logger logpkg.Logger) (*APIKeyClaimMapper, error) {
-	apiKeyCfg := NewApiKeyConfig()
+	apiKeyCfg := NewAPIKeyConfig()
 	if err := apiKeyCfg.LoadEnv(); err != nil {
 		return nil, err
 	}
@@ -37,7 +38,7 @@ func (m *APIKeyClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*author
 		return nil, nil
 	}
 
-	claims := m.cfg.GetByApiKey(apiKey)
+	claims := m.cfg.GetByAPIKey(apiKey)
 	if claims == nil {
 		return nil, nil
 	}

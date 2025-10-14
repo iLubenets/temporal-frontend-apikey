@@ -151,7 +151,7 @@ func TestAPIKeyClaimMapper_GetClaims_ValidKey(t *testing.T) {
 			expectedSubject: "admin-key",
 			validateClaims: func(t *testing.T, claims *authorization.Claims) {
 				assert.Equal(t, authorization.RoleAdmin, claims.System)
-				assert.Equal(t, 0, len(claims.Namespaces))
+				assert.Empty(t, claims.Namespaces)
 			},
 		},
 	}

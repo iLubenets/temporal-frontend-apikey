@@ -1,4 +1,4 @@
-.PHONY: docker-build docker-up docker-down test-api test-all
+.PHONY: docker-build docker-up docker-down test-integration test test-all
 
 docker-build:
 	@echo "🐳 Building Docker image..."
@@ -10,20 +10,29 @@ docker-build:
 
 docker-up:
 	@echo "🚀 Starting Temporal with API key authentication..."
-	cd test-docker-compose && docker compose up -d
+	docker compose -f test-docker-compose/docker-compose.yml up -d
 	sleep 15
 
 docker-down:
 	@echo "🧹 Removing Docker volumes..."
-	cd test-docker-compose && docker compose down -v
+	docker compose -f test-docker-compose/docker-compose.yml down -v
 	@echo "✅ All cleaned"
 
-test-api:
+test-integration:
 	@echo "🧪 Running test suite..."
 	@echo ""
-	cd test-docker-compose && ./test-api.sh
+	./test-docker-compose/test-api.sh
 	@echo ""
 	@echo "All tests completed!"
-	@clean
 
-test-all: docker-build docker-up test-api docker-down
+test:
+	@echo "Run go generate, tidy, lint, test.."
+	@echo ""
+	go generate ./...
+	go mod tidy
+	golangci-lint run ./...
+	go test -v -timeout=100s -race ./...
+	@echo ""
+	@echo "All checks completed!"
+
+test-all: test docker-build docker-up test-integration docker-down
