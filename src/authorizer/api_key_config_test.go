@@ -27,19 +27,17 @@ func TestRoleFromString(t *testing.T) {
 		{"WORKER uppercase", "WORKER", authorization.RoleWorker},
 		{"worker with spaces", "  worker  ", authorization.RoleWorker},
 		{"reader", "reader", authorization.RoleReader},
-		{"read", "read", authorization.RoleReader},
 		{"Reader uppercase", "Reader", authorization.RoleReader},
-		{"READ uppercase", "READ", authorization.RoleReader},
 		{"writer", "writer", authorization.RoleWriter},
-		{"write", "write", authorization.RoleWriter},
 		{"Writer uppercase", "Writer", authorization.RoleWriter},
-		{"WRITE uppercase", "WRITE", authorization.RoleWriter},
 		{"admin", "admin", authorization.RoleAdmin},
 		{"Admin uppercase", "Admin", authorization.RoleAdmin},
 		{"ADMIN uppercase", "ADMIN", authorization.RoleAdmin},
 		{"undefined empty", "", authorization.RoleUndefined},
 		{"undefined invalid", "invalid", authorization.RoleUndefined},
 		{"undefined unknown", "unknown-role", authorization.RoleUndefined},
+		{"read should be undefined", "read", authorization.RoleUndefined},
+		{"write should be undefined", "write", authorization.RoleUndefined},
 	}
 
 	for _, tt := range tests {
@@ -107,26 +105,6 @@ func TestAPIKeyConfig_LoadEnv_Success(t *testing.T) {
 				claims := cfg.GetByApiKey("worker-key")
 				require.NotNil(t, claims)
 				assert.Equal(t, authorization.RoleWorker, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:         "key with read role synonym",
-			envValue:     "read-key:read:my-namespace",
-			expectedKeys: 1,
-			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims := cfg.GetByApiKey("read-key")
-				require.NotNil(t, claims)
-				assert.Equal(t, authorization.RoleReader, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:         "key with write role synonym",
-			envValue:     "write-key:write:my-namespace",
-			expectedKeys: 1,
-			validateClaims: func(t *testing.T, cfg *APIKeyConfig) {
-				claims := cfg.GetByApiKey("write-key")
-				require.NotNil(t, claims)
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
 			},
 		},
 		{

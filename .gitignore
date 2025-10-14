@@ -10,6 +10,8 @@ bin/
 *.test
 *.out
 go.work
+coverage.out
+coverage.html
 
 # IDE
 .idea/

@@ -1,5 +1,8 @@
 # Temporal API Key Authorization
 
+[![CI](https://github.com/ilubenets/temporal-apikey/actions/workflows/ci.yaml/badge.svg)](https://github.com/ilubenets/temporal-apikey/actions/workflows/ci.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ilubenets/temporal-apikey)](https://goreportcard.com/report/github.com/ilubenets/temporal-apikey)
+
 A custom Temporal frontend server with API key-based authentication using a custom `ClaimMapper`.
 
 [Temporal.io Claim-Mapper Plugin](https://docs.temporal.io/self-hosted-guide/security#claim-mapper)
@@ -49,15 +52,14 @@ admin-key:admin:*;app1:writer:ns1;app2:reader:ns2
 If you get an error `│ 2025/10/13 11:03:03 config file corrupted: no config files found within /etc/temporal/config`
 
 ```yaml
-# specify config pass used by the temporal cluster
+# specify the correct env used by the temporal cluster
+# - docker
+# - kubernetes
+# - some custom one
 frontend-apikey:
   additionalEnv:
     - name: TEMPORAL_ENVIRONMENT
       value: kubernetes
-    - name: TEMPORAL_ROOT
-      value: /etc/temporal
-    - name: TEMPORAL_CONFIG_DIR
-      value: config
 ```
 
 ## Test (integration)
