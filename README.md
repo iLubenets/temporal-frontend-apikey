@@ -1,7 +1,7 @@
 # Temporal API Key Authorization
 
-[![CI](https://github.com/ilubenets/temporal-apikey/actions/workflows/ci.yaml/badge.svg)](https://github.com/ilubenets/temporal-apikey/actions/workflows/ci.yaml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ilubenets/temporal-apikey)](https://goreportcard.com/report/github.com/ilubenets/temporal-apikey)
+[![CI](https://github.com/ilubenets/temporal-frontend-apikey/actions/workflows/ci.yaml/badge.svg)](https://github.com/ilubenets/temporal-frontend-apikey/actions/workflows/ci.yaml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ilubenets/temporal-frontend-apikey)](https://goreportcard.com/report/github.com/ilubenets/temporal-frontend-apikey)
 
 A custom Temporal frontend server with API key-based authentication using a custom `ClaimMapper`.
 
@@ -56,7 +56,7 @@ If you get an error `│ 2025/10/13 11:03:03 config file corrupted: no config fi
 # - docker
 # - kubernetes
 # - some custom one
-frontend-apikey:
+frontend-external:
   additionalEnv:
     - name: TEMPORAL_ENVIRONMENT
       value: kubernetes

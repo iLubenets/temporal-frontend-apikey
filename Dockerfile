@@ -4,6 +4,10 @@ ARG TEMPORAL_VERSION=1.28.1
 # Build stage - compile custom temporal with API key auth
 FROM golang:1.25 AS builder
 
+# Docker BuildKit provides these automatically for multiarch builds
+ARG TARGETOS
+ARG TARGETARCH
+
 WORKDIR /
 
 # Cache dependencies
@@ -12,7 +16,7 @@ RUN go mod download
 
 # Build static binary (no CGO needed)
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -trimpath -o /out/temporal-server ./src/server
 
 # Reuse official Temporal image
