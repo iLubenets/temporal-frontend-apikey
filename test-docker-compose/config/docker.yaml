@@ -37,6 +37,17 @@ global:
   pprof:
     port: 0
 
+  authorization:
+    # Enable JWT claim mapper for OAuth/SSO integration
+    claimMapper: "default"
+    jwtKeyProvider:
+      keySourceURIs:
+        # Mock OAuth server JWKS endpoint
+        - "http://oauth-mock:8080/.well-known/jwks.json"
+      refreshInterval: 1h
+    # Permissions mapping for JWT claims
+    permissionsClaimName: "permissions"
+
   metrics:
     prometheus:
       timerType: histogram
