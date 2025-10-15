@@ -1,0 +1,33 @@
+{
+  "interactiveLogin": true,
+  "httpServer": "NettyWrapper",
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "authorization_code",
+          "claims": {
+            "sub": "test-user@temporal.io",
+            "aud": ["temporal-ui", "temporal-frontend"],
+            "email": "test-user@temporal.io",
+            "name": "Test User",
+            "groups": ["temporal-admins"],
+            "permissions": ["admin:*"]
+          }
+        },
+        {
+          "requestParam": "grant_type",
+          "match": "client_credentials",
+          "claims": {
+            "sub": "temporal-frontend",
+            "aud": ["temporal-frontend"],
+            "permissions": ["write:default"]
+          }
+        }
+      ]
+    }
+  ]
+}

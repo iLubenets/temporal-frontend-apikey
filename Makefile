@@ -10,12 +10,12 @@ docker-build:
 
 docker-up:
 	@echo "🚀 Starting Temporal with API key authentication..."
-	docker compose -f test-docker-compose/docker-compose.yml up -d
+	docker compose -f test-docker-compose/docker-compose.yaml up -d
 	sleep 15
 
 docker-down:
 	@echo "🧹 Removing Docker volumes..."
-	docker compose -f test-docker-compose/docker-compose.yml down -v
+	docker compose -f test-docker-compose/docker-compose.yaml down -v
 	@echo "✅ All cleaned"
 
 test-integration:

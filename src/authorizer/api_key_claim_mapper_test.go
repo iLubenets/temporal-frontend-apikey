@@ -1,7 +1,6 @@
 package authorizer
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,230 +9,108 @@ import (
 	"go.temporal.io/server/common/log"
 )
 
-func TestNewAPIKeyClaimMapper_Success(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "test-key:reader:test-namespace")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
-	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
-
-	require.NoError(t, err)
-	assert.NotNil(t, mapper)
-	assert.NotNil(t, mapper.logger)
-	assert.NotNil(t, mapper.cfg)
+func TestPermissionToRole(t *testing.T) {
+	assert.Equal(t, authorization.RoleReader, permissionToRole("read"))
+	assert.Equal(t, authorization.RoleReader, permissionToRole("READ"))
+	assert.Equal(t, authorization.RoleWriter, permissionToRole("write"))
+	assert.Equal(t, authorization.RoleWorker, permissionToRole("worker"))
+	assert.Equal(t, authorization.RoleAdmin, permissionToRole("admin"))
+	assert.Equal(t, authorization.RoleUndefined, permissionToRole("unknown"))
 }
 
-func TestNewAPIKeyClaimMapper_Error(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
-	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
-
-	require.Error(t, err)
-	assert.Nil(t, mapper)
-	assert.Contains(t, err.Error(), "invalid key")
-}
-
-func TestAPIKeyClaimMapper_GetClaims_NilAuthInfo(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "test-key:reader:test-namespace")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
-	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
+func TestParseApiKeysString_Success(t *testing.T) {
+	keys, err := parseAPIKeysString("app1:write:ns1; admin:*:should-not-parse; admin:admin:* ; worker:worker:ns2 ;  ")
 	require.NoError(t, err)
 
-	claims, err := mapper.GetClaims(nil)
+	// app1 key -> namespace role
+	c1 := keys["app1"]
+	require.NotNil(t, c1)
+	assert.Equal(t, "app1", c1.Subject)
+	assert.Equal(t, authorization.RoleWriter, c1.Namespaces["ns1"])
+	assert.Equal(t, authorization.RoleUndefined, c1.System)
 
-	assert.Nil(t, claims)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "missing auth info")
+	// admin key -> system role
+	c2 := keys["admin"]
+	require.NotNil(t, c2)
+	assert.Equal(t, authorization.RoleAdmin, c2.System)
+	assert.Empty(t, c2.Namespaces)
+
+	// worker key -> namespace role
+	c3 := keys["worker"]
+	require.NotNil(t, c3)
+	assert.Equal(t, authorization.RoleWorker, c3.Namespaces["ns2"])
 }
 
-func TestAPIKeyClaimMapper_GetClaims_EmptyToken(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "test-key:reader:test-namespace")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
+func TestParseApiKeysString_Invalid(t *testing.T) {
+	// wrong parts
+	_, err := parseAPIKeysString("bad:format")
+	require.Error(t, err)
 
+	// empty sections are skipped, but malformed entries error
+	_, err = parseAPIKeysString("ok:read:ns; badentry")
+	require.Error(t, err)
+}
+
+func TestAPIKeyClaimMapper_GetClaims_TokenVariants(t *testing.T) {
 	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
+	mapper, err := NewAPIKeyClaimMapper("valid:write:ns;admin:admin:*", logger)
 	require.NoError(t, err)
 
 	tests := []struct {
-		name      string
-		authToken string
+		name          string
+		authToken     string
+		expectSubject string
+		validate      func(*testing.T, *authorization.Claims)
 	}{
-		{"empty string", ""},
-		{"whitespace only", "   "},
-		{"bearer with no token", "Bearer "},
-		{"bearer with whitespace", "Bearer    "},
+		{"raw token", "valid", "valid", func(t *testing.T, c *authorization.Claims) {
+			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
+		}},
+		{"bearer lower", "bearer valid", "valid", func(t *testing.T, c *authorization.Claims) {
+			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
+		}},
+		{"bearer upper", "Bearer   valid", "valid", func(t *testing.T, c *authorization.Claims) {
+			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
+		}},
+		{"admin wildcard", "Bearer admin", "admin", func(t *testing.T, c *authorization.Claims) {
+			assert.Equal(t, authorization.RoleAdmin, c.System)
+		}},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			authInfo := &authorization.AuthInfo{
-				AuthToken: tt.authToken,
-			}
-
-			claims, err := mapper.GetClaims(authInfo)
-
-			assert.Nil(t, claims)
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestAPIKeyClaimMapper_GetClaims_ValidKey(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "valid-key:writer:my-namespace;admin-key:admin:*")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
-	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name            string
-		authToken       string
-		expectedSubject string
-		validateClaims  func(t *testing.T, claims *authorization.Claims)
-	}{
-		{
-			name:            "direct key",
-			authToken:       "valid-key",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-				assert.Equal(t, authorization.RoleUndefined, claims.System)
-			},
-		},
-		{
-			name:            "bearer token lowercase",
-			authToken:       "bearer valid-key",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:            "bearer token uppercase",
-			authToken:       "Bearer valid-key",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:            "bearer token mixed case",
-			authToken:       "BeArEr valid-key",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:            "bearer token with extra spaces",
-			authToken:       "Bearer   valid-key",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:            "token with leading/trailing spaces",
-			authToken:       "  valid-key  ",
-			expectedSubject: "valid-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleWriter, claims.Namespaces["my-namespace"])
-			},
-		},
-		{
-			name:            "admin key with wildcard",
-			authToken:       "admin-key",
-			expectedSubject: "admin-key",
-			validateClaims: func(t *testing.T, claims *authorization.Claims) {
-				assert.Equal(t, authorization.RoleAdmin, claims.System)
-				assert.Empty(t, claims.Namespaces)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			authInfo := &authorization.AuthInfo{
-				AuthToken: tt.authToken,
-			}
-
-			claims, err := mapper.GetClaims(authInfo)
-
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			claims, err := mapper.GetClaims(&authorization.AuthInfo{AuthToken: tc.authToken})
 			require.NoError(t, err)
 			require.NotNil(t, claims)
-			assert.Equal(t, tt.expectedSubject, claims.Subject)
-
-			if tt.validateClaims != nil {
-				tt.validateClaims(t, claims)
+			assert.Equal(t, tc.expectSubject, claims.Subject)
+			if tc.validate != nil {
+				tc.validate(t, claims)
 			}
 		})
 	}
 }
 
-func TestAPIKeyClaimMapper_GetClaims_InvalidKey(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "valid-key:reader:test-namespace")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
+func TestAPIKeyClaimMapper_GetClaims_Nones(t *testing.T) {
 	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
+	mapper, err := NewAPIKeyClaimMapper("k:read:ns", logger)
 	require.NoError(t, err)
 
-	tests := []struct {
-		name      string
-		authToken string
-	}{
-		{"non-existing key", "invalid-key"},
-		{"bearer with invalid key", "Bearer invalid-key"},
-		{"partial key", "valid"},
-		{"key with suffix", "valid-key-extra"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			authInfo := &authorization.AuthInfo{
-				AuthToken: tt.authToken,
-			}
-
-			claims, err := mapper.GetClaims(authInfo)
-
-			assert.Nil(t, claims)
-			assert.NoError(t, err)
-		})
-	}
-}
-
-func TestAPIKeyClaimMapper_GetClaims_MultipleKeys(t *testing.T) {
-	os.Setenv("TEMPORAL_API_KEYS", "key1:reader:ns1;key2:writer:ns2;key3:worker:ns3")
-	defer os.Unsetenv("TEMPORAL_API_KEYS")
-
-	logger := log.NewTestLogger()
-	mapper, err := NewAPIKeyClaimMapper(logger)
+	// nil auth info
+	claims, err := mapper.GetClaims(nil)
 	require.NoError(t, err)
+	assert.Nil(t, claims)
 
-	// Test that each key returns its own claims
-	authInfo1 := &authorization.AuthInfo{AuthToken: "key1"}
-	claims1, err := mapper.GetClaims(authInfo1)
+	// empty token
+	claims, err = mapper.GetClaims(&authorization.AuthInfo{AuthToken: "   "})
 	require.NoError(t, err)
-	require.NotNil(t, claims1)
-	assert.Equal(t, "key1", claims1.Subject)
-	assert.Equal(t, authorization.RoleReader, claims1.Namespaces["ns1"])
+	assert.Nil(t, claims)
 
-	authInfo2 := &authorization.AuthInfo{AuthToken: "key2"}
-	claims2, err := mapper.GetClaims(authInfo2)
+	// non-bearer scheme should be ignored (let other mappers handle)
+	claims, err = mapper.GetClaims(&authorization.AuthInfo{AuthToken: "Basic abc"})
 	require.NoError(t, err)
-	require.NotNil(t, claims2)
-	assert.Equal(t, "key2", claims2.Subject)
-	assert.Equal(t, authorization.RoleWriter, claims2.Namespaces["ns2"])
+	assert.Nil(t, claims)
 
-	authInfo3 := &authorization.AuthInfo{AuthToken: "key3"}
-	claims3, err := mapper.GetClaims(authInfo3)
+	// unknown api key
+	claims, err = mapper.GetClaims(&authorization.AuthInfo{AuthToken: "Bearer nope"})
 	require.NoError(t, err)
-	require.NotNil(t, claims3)
-	assert.Equal(t, "key3", claims3.Subject)
-	assert.Equal(t, authorization.RoleWorker, claims3.Namespaces["ns3"])
+	assert.Nil(t, claims)
 }

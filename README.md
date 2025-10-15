@@ -31,8 +31,8 @@ TEMPORAL_API_KEYS="key:role:namespace;key2:role2:ns2"
 **Format:** `key:role:namespace`
 
 - `key` - The API key (used in `Authorization: Bearer <key>`)
-- `role` - Role name: `admin`, `writer`, `reader`, `worker`
-- `namespace` - Temporal namespace or `*` for all namespaces
+- `role` - Role name: `admin`, `write`, `read`, `worker`
+- `namespace` - Temporal namespace or `*` for all namespaces (system level)
 
 **Examples:**
 
@@ -44,7 +44,7 @@ admin-secret:admin:*
 app1-key:writer:app1-namespace
 
 # Multiple keys
-admin-key:admin:*;app1:writer:ns1;app2:reader:ns2
+admin-key:admin:*;app1:write:ns1;app2:read:ns2
 ```
 
 ### Helm

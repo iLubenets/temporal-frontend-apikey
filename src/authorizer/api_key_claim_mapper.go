@@ -8,40 +8,102 @@ import (
 	logpkg "go.temporal.io/server/common/log"
 )
 
+const (
+	authorizationBearer = "bearer"
+	permissionRead      = "read"
+	permissionWrite     = "write"
+	permissionWorker    = "worker"
+	permissionAdmin     = "admin"
+)
+
 // APIKeyClaimMapper implements authorization.ClaimMapper only
 type APIKeyClaimMapper struct {
 	logger logpkg.Logger
-	cfg    *APIKeyConfig
+	keys   map[string]*authorization.Claims
 }
 
 // NewAPIKeyClaimMapper creates a new APIKeyClaimMapper with the given logger and loads API key configuration from environment.
-func NewAPIKeyClaimMapper(logger logpkg.Logger) (*APIKeyClaimMapper, error) {
-	apiKeyCfg := NewAPIKeyConfig()
-	if err := apiKeyCfg.LoadEnv(); err != nil {
+func NewAPIKeyClaimMapper(apiKeysString string, logger logpkg.Logger) (*APIKeyClaimMapper, error) {
+	keys, err := parseAPIKeysString(apiKeysString)
+	if err != nil {
 		return nil, err
 	}
 	logger.Info("API key claim-mapper initialized")
-	return &APIKeyClaimMapper{logger: logger, cfg: apiKeyCfg}, nil
+	return &APIKeyClaimMapper{logger: logger, keys: keys}, nil
 }
 
 // GetClaims extracts API key from Authorization header and maps to Claims.
 func (m *APIKeyClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authorization.Claims, error) {
 	if authInfo == nil {
-		return nil, fmt.Errorf("missing auth info")
+		return nil, nil
 	}
-	apiKey := strings.TrimSpace(authInfo.AuthToken)
-	if strings.HasPrefix(strings.ToLower(apiKey), "bearer ") {
-		apiKey = strings.TrimSpace(apiKey[len("bearer "):])
-	}
-	if apiKey == "" {
-		// No token => no claims. Default authorizer will deny (except health checks).
+	raw := strings.TrimSpace(authInfo.AuthToken)
+	if raw == "" {
 		return nil, nil
 	}
 
-	claims := m.cfg.GetByAPIKey(apiKey)
-	if claims == nil {
-		return nil, nil
+	token := raw
+	if idx := strings.IndexByte(raw, ' '); idx > 0 {
+		scheme := strings.TrimSpace(raw[:idx])
+		rest := strings.TrimSpace(raw[idx+1:])
+		if strings.EqualFold(scheme, authorizationBearer) {
+			token = rest
+		} else {
+			// Not an API-key scheme; skip so other mappers may handle
+			return nil, nil
+		}
 	}
 
-	return claims, nil
+	if claims, ok := m.keys[token]; ok {
+		return claims, nil
+	}
+	return nil, nil
+}
+
+func parseAPIKeysString(apiKeysStr string) (map[string]*authorization.Claims, error) {
+	keys := make(map[string]*authorization.Claims)
+	for _, entry := range strings.Split(apiKeysStr, ";") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		parts := strings.Split(strings.TrimSpace(entry), ":")
+		if len(parts) != 3 {
+			return keys, fmt.Errorf("invalid key [%.*s...] format - expected <key>:<role>:<namespace>", 3, entry)
+		}
+		if parts[0] == "" || parts[1] == "" || parts[2] == "" {
+			return keys, fmt.Errorf("invalid key format: [<key>(len:%d):<role>(val:%s):<namespace>(val:%s)]", len(parts[0]), parts[1], parts[2])
+		}
+
+		apiKey := parts[0]
+		role := permissionToRole(parts[1])
+		namespace := parts[2]
+		claim := &authorization.Claims{
+			Subject:    apiKey,
+			Namespaces: map[string]authorization.Role{},
+		}
+		if namespace == "*" {
+			claim.System = role
+		} else {
+			claim.Namespaces[namespace] = role
+		}
+
+		keys[apiKey] = claim
+	}
+
+	return keys, nil
+}
+
+func permissionToRole(permission string) authorization.Role {
+	switch strings.ToLower(permission) {
+	case permissionRead:
+		return authorization.RoleReader
+	case permissionWrite:
+		return authorization.RoleWriter
+	case permissionAdmin:
+		return authorization.RoleAdmin
+	case permissionWorker:
+		return authorization.RoleWorker
+	}
+	return authorization.RoleUndefined
 }

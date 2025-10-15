@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/ilubenets/temporal-apikey/src/authorizer"
 	"go.temporal.io/server/common/authorization"
@@ -35,10 +36,20 @@ func main() {
 		log.Fatalf("config [%s/%s.yaml] not found or corrupted: %v", configDirPath, env, err)
 	}
 
-	// custom API-KEY auth
-	mapper, err := authorizer.NewAPIKeyClaimMapper(logger)
-	if err != nil {
-		log.Fatal(err)
+	claimMappers := authorizer.NewMultiClaimMapper()
+	// Prefer API key processing first so JWT errors do not short-circuit
+	if apiKeys := os.Getenv("TEMPORAL_API_KEYS"); apiKeys != "" {
+		apiKeyClaimMapper, err := authorizer.NewAPIKeyClaimMapper(apiKeys, logger)
+		if err != nil {
+			log.Fatalf("ApiKeyClaimMapper: %v", err)
+		}
+		claimMappers.Add(apiKeyClaimMapper)
+	}
+
+	if strings.EqualFold(cfg.Global.Authorization.ClaimMapper, "default") {
+		claimMappers.Add(authorization.NewDefaultJWTClaimMapper(
+			authorization.NewDefaultTokenKeyProvider(&cfg.Global.Authorization, logger), &cfg.Global.Authorization, logger,
+		))
 	}
 
 	s, err := temporal.NewServer(
@@ -49,7 +60,7 @@ func main() {
 		temporal.InterruptOn(temporal.InterruptCh()),
 		temporal.WithAuthorizer(authorization.NewDefaultAuthorizer()),
 		// customer claim manager
-		temporal.WithClaimMapper(func(*config.Config) authorization.ClaimMapper { return mapper }),
+		temporal.WithClaimMapper(func(*config.Config) authorization.ClaimMapper { return claimMappers }),
 	)
 	if err != nil {
 		log.Fatal(err)
