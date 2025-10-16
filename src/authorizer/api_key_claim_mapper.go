@@ -16,24 +16,24 @@ const (
 	permissionAdmin     = "admin"
 )
 
-// APIKeyClaimMapper implements authorization.ClaimMapper only
-type APIKeyClaimMapper struct {
+// apiKeyClaimMapper implements authorization.ClaimMapper only
+type apiKeyClaimMapper struct {
 	logger logpkg.Logger
 	keys   map[string]*authorization.Claims
 }
 
-// NewAPIKeyClaimMapper creates a new APIKeyClaimMapper with the given logger and loads API key configuration from environment.
-func NewAPIKeyClaimMapper(apiKeysString string, logger logpkg.Logger) (*APIKeyClaimMapper, error) {
+// NewAPIKeyClaimMapper creates a new apiKeyClaimMapper with the given logger and loads API key configuration from environment.
+func NewAPIKeyClaimMapper(apiKeysString string, logger logpkg.Logger) (authorization.ClaimMapper, error) {
 	keys, err := parseAPIKeysString(apiKeysString)
 	if err != nil {
 		return nil, err
 	}
 	logger.Info("API key claim-mapper initialized")
-	return &APIKeyClaimMapper{logger: logger, keys: keys}, nil
+	return &apiKeyClaimMapper{logger: logger, keys: keys}, nil
 }
 
 // GetClaims extracts API key from Authorization header and maps to Claims.
-func (m *APIKeyClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authorization.Claims, error) {
+func (m *apiKeyClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authorization.Claims, error) {
 	if authInfo == nil {
 		return nil, nil
 	}

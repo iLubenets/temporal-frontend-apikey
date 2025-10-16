@@ -15,7 +15,9 @@
             "email": "test-user@temporal.io",
             "name": "Test User",
             "groups": ["temporal-admins"],
-            "permissions": ["admin:*"]
+            "permissions": [
+                "temporal-system:admin"
+            ]
           }
         },
         {
@@ -24,7 +26,7 @@
           "claims": {
             "sub": "temporal-frontend",
             "aud": ["temporal-frontend"],
-            "permissions": ["write:default"]
+            "permissions": ["default:read"]
           }
         }
       ]

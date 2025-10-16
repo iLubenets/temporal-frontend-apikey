@@ -53,7 +53,8 @@ services:
     environment:
       <<: *sql_env
       SERVICES: history
-      TEMPORAL_ADDRESS: temporal-frontend-internal:7233
+      TEMPORAL_ADDRESS: temporal-frontend-internal:7236
+      USE_INTERNAL_FRONTEND: "true"
       TEMPORAL_ENVIRONMENT: docker
       TEMPORAL_CONFIG_DIR: /config
     volumes:
@@ -69,13 +70,14 @@ services:
     environment:
       <<: *sql_env
       SERVICES: matching
-      TEMPORAL_ADDRESS: temporal-frontend-internal:7233
+      TEMPORAL_ADDRESS: temporal-frontend-internal:7236
+      USE_INTERNAL_FRONTEND: "true"
       TEMPORAL_ENVIRONMENT: docker
       TEMPORAL_CONFIG_DIR: /config
     volumes:
       - ./config/docker.yaml:/config/docker.yaml:ro
     networks: [temporal-net]
-    restart: no
+    restart: on-failure
 
   temporal-worker:
     image: temporalio/server:${TEMPORAL_VERSION:-1.28.1}
@@ -86,17 +88,15 @@ services:
       <<: *sql_env
       SERVICES: worker
       # (!) internal FE port
-      PUBLIC_FRONTEND_ADDRESS: temporal-frontend-internal:7233
+      TEMPORAL_ADDRESS: temporal-frontend-internal:7236
+      USE_INTERNAL_FRONTEND: "true"
       TEMPORAL_ENVIRONMENT: docker
       TEMPORAL_CONFIG_DIR: /config
-      # Disable the worker scanners that require auth
-      TEMPORAL_HISTORY_SCANNER_ENABLED: "false"
-      TEMPORAL_TASKQUEUE_SCANNER_ENABLED: "false"
     volumes:
       - ./config/docker.yaml:/config/docker.yaml:ro
     networks: [temporal-net]
     profiles: ["with-worker"]  # Optional - start only when explicitly requested
-    restart: no
+    restart: on-failure
 
   # UI (OIDC) -> forwards Authorization to EXTERNAL frontend
   temporal-ui:
@@ -106,18 +106,17 @@ services:
       temporal-frontend-external: { condition: service_started }
       oauth-mock: { condition: service_started }
     environment:
-      TEMPORAL_ADDRESS: temporal-frontend-external:7232
       TEMPORAL_AUTH_ENABLED: "true"
       TEMPORAL_AUTH_TYPE: oidc
       # UI connects to oauth-mock via Docker network
-      # But oauth-mock will return localhost:8081 URLs for the browser
-      TEMPORAL_AUTH_PROVIDER_URL: http://oauth-mock:8080/default
+      TEMPORAL_AUTH_PROVIDER_URL: http://host.docker.internal:8081/default
       TEMPORAL_AUTH_CLIENT_ID: temporal-ui
       TEMPORAL_AUTH_CLIENT_SECRET: temporal-ui-secret
       TEMPORAL_AUTH_CALLBACK_URL: http://localhost:8080/auth/sso/callback
       TEMPORAL_AUTH_SCOPES: openid,profile,email
       # (!) Forward the bearer token to your external frontend
       TEMPORAL_FORWARD_HEADERS: authorization
+      TEMPORAL_ADDRESS: temporal-frontend-external:7233
     ports: ["8080:8080"]
     networks: [temporal-net]
 
@@ -128,7 +127,7 @@ services:
     depends_on:
       temporal-frontend-external: { condition: service_started }
     environment:
-      TEMPORAL_ADDRESS: temporal-frontend-external:7232
+      TEMPORAL_ADDRESS: temporal-frontend-external:7233
     stdin_open: true
     tty: true
     networks: [temporal-net]
@@ -145,18 +144,18 @@ services:
       <<: *sql_env
       SERVICES: frontend
       # (!) the correct env
-      TEMPORAL_ADDRESS: temporal-frontend-internal:7233
+      #TEMPORAL_ADDRESS: temporal-frontend-internal:7233
       TEMPORAL_ENVIRONMENT: docker
       TEMPORAL_CONFIG_DIR: /config
       # (!)
       # Example API keys for local testing:
       TEMPORAL_API_KEYS: "admin-key:admin:*;test-key:writer:default"
       # (!) No need to add OAuth ENVs from temporal-ui, it will be used from /config/docker.yaml global.authorization.jwtKeyProvider
-    ports: ["7232:7232"]   # expose only the external frontend
+    ports: ["7233:7233"]   # expose only the external frontend
     volumes:
       - ./config/docker.yaml:/config/docker.yaml:ro
     networks: [temporal-net]
-    restart: no
+    restart: always
 
   # ---------- INTERNAL FRONTEND (stock) ----------
   # Used by History/Matching/Worker. No custom auth.
@@ -176,4 +175,4 @@ services:
     volumes:
       - ./config/docker.yaml:/config/docker.yaml:ro
     networks: [temporal-net]
-    restart: no
+    restart: always

@@ -36,18 +36,18 @@ func main() {
 		log.Fatalf("config [%s/%s.yaml] not found or corrupted: %v", configDirPath, env, err)
 	}
 
-	claimMappers := authorizer.NewMultiClaimMapper()
+	claimMappers := authorizer.NewMultiClaimMapper(logger)
 	// Prefer API key processing first so JWT errors do not short-circuit
 	if apiKeys := os.Getenv("TEMPORAL_API_KEYS"); apiKeys != "" {
 		apiKeyClaimMapper, err := authorizer.NewAPIKeyClaimMapper(apiKeys, logger)
 		if err != nil {
 			log.Fatalf("ApiKeyClaimMapper: %v", err)
 		}
-		claimMappers.Add(apiKeyClaimMapper)
+		claimMappers.Add("apiKeyClaimMapper", apiKeyClaimMapper)
 	}
 
 	if strings.EqualFold(cfg.Global.Authorization.ClaimMapper, "default") {
-		claimMappers.Add(authorization.NewDefaultJWTClaimMapper(
+		claimMappers.Add("defaultJWTClaimMapper", authorization.NewDefaultJWTClaimMapper(
 			authorization.NewDefaultTokenKeyProvider(&cfg.Global.Authorization, logger), &cfg.Global.Authorization, logger,
 		))
 	}

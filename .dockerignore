@@ -19,3 +19,7 @@ temporal-server
 # OS
 .DS_Store
 *.log
+
+# docs
+docs
+*.md

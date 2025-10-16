@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/server/common/authorization"
+	"go.temporal.io/server/common/log"
 )
 
 type fakeMapper struct {
@@ -19,11 +20,12 @@ func (f fakeMapper) GetClaims(a *authorization.AuthInfo) (*authorization.Claims,
 }
 
 func TestMultiClaimMapper_OrderAndShortCircuit(t *testing.T) {
-	m := NewMultiClaimMapper()
+	logger := log.NewTestLogger()
+	m := NewMultiClaimMapper(logger)
 	// first returns empty -> continue
-	m.Add(fakeMapper{claims: &authorization.Claims{}})
+	m.Add("fakeMapper1", fakeMapper{claims: &authorization.Claims{}})
 	// second returns real claims -> stop
-	m.Add(fakeMapper{claims: &authorization.Claims{Subject: "ok", System: authorization.RoleAdmin}})
+	m.Add("fakeMapper2", fakeMapper{claims: &authorization.Claims{Subject: "ok", System: authorization.RoleAdmin}})
 
 	claims, err := m.GetClaims(&authorization.AuthInfo{AuthToken: "x"})
 	require.NoError(t, err)
@@ -33,9 +35,10 @@ func TestMultiClaimMapper_OrderAndShortCircuit(t *testing.T) {
 }
 
 func TestMultiClaimMapper_ErrorPropagation(t *testing.T) {
-	m := NewMultiClaimMapper()
-	m.Add(fakeMapper{err: errors.New("boom")})
-	m.Add(fakeMapper{claims: &authorization.Claims{Subject: "later"}})
+	logger := log.NewTestLogger()
+	m := NewMultiClaimMapper(logger)
+	m.Add("fakeMapper1", fakeMapper{err: errors.New("boom")})
+	m.Add("fakeMapper2", fakeMapper{claims: &authorization.Claims{Subject: "later"}})
 
 	claims, err := m.GetClaims(&authorization.AuthInfo{AuthToken: "x"})
 	assert.Nil(t, claims)

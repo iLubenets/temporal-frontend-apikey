@@ -42,8 +42,8 @@ global:
     claimMapper: "default"
     jwtKeyProvider:
       keySourceURIs:
-        # Mock OAuth server JWKS endpoint
-        - "http://oauth-mock:8080/.well-known/jwks.json"
+        - "http://oauth-mock:8080/default/jwks"
+        - "http://host.docker.internal:8081/default/jwks"
       refreshInterval: 1h
     # Permissions mapping for JWT claims
     permissionsClaimName: "permissions"
@@ -57,16 +57,17 @@ services:
   frontend:
     rpc:
       # (!) non-default ports to avoid conflict with internal-frontend
-      grpcPort: 7232
-      membershipPort: 6932
-      bindOnLocalHost: false
-      httpPort: 7242
-  internal-frontend:
-    rpc:
       grpcPort: 7233
       membershipPort: 6933
       bindOnLocalHost: false
       httpPort: 7243
+  internal-frontend:
+    enabled: true
+    rpc:
+      port: 7236
+      membershipPort: 6936
+      httpPort: 7246
+      bindOnLocalHost: false
   history:
     rpc:
       grpcPort: 7234
@@ -93,7 +94,7 @@ clusterMetadata:
       enabled: true
       initialFailoverVersion: 1
       rpcName: "frontend"
-      rpcAddress: "temporal-frontend-internal:7233"
+      rpcAddress: "temporal-frontend-internal:7236"
 
 dcRedirectionPolicy:
   policy: "noop"
