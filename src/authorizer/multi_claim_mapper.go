@@ -1,6 +1,8 @@
 package authorizer
 
 import (
+	"fmt"
+
 	"go.temporal.io/server/common/authorization"
 	logpkg "go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -28,7 +30,7 @@ func (m *MultiClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authori
 	for name, cm := range m.claimMappers {
 		claims, err := cm.GetClaims(authInfo)
 		if err != nil {
-			m.logger.Warn("failed to get claims", tag.Name(name), tag.Error(err))
+			m.logger.Warn(fmt.Sprintf("failed to get claims authInfo:%v", authInfo), tag.Name(name), tag.Error(err))
 			return claims, err
 		}
 		if claims == nil || (claims.System == authorization.RoleUndefined && len(claims.Namespaces) == 0) {
