@@ -20,6 +20,7 @@ func NewMultiClaimMapper(logger logpkg.Logger) *MultiClaimMapper {
 // Add new claim mapper to the chain
 func (m *MultiClaimMapper) Add(claimMapperName string, claimMapper authorization.ClaimMapper) {
 	m.claimMappers[claimMapperName] = claimMapper
+	m.logger.Info("adding claim mapper", tag.Name(claimMapperName))
 }
 
 // GetClaims converts authorization info of a subject into Temporal claims (permissions) for authorization
