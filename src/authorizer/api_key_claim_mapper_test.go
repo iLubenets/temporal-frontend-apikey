@@ -62,13 +62,10 @@ func TestAPIKeyClaimMapper_GetClaims_TokenVariants(t *testing.T) {
 		expectSubject string
 		validate      func(*testing.T, *authorization.Claims)
 	}{
-		{"raw token", "valid", "valid", func(t *testing.T, c *authorization.Claims) {
-			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
-		}},
 		{"bearer lower", "bearer valid", "valid", func(t *testing.T, c *authorization.Claims) {
 			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
 		}},
-		{"bearer upper", "Bearer   valid", "valid", func(t *testing.T, c *authorization.Claims) {
+		{"bearer upper", "Bearer valid", "valid", func(t *testing.T, c *authorization.Claims) {
 			assert.Equal(t, authorization.RoleWriter, c.Namespaces["ns"])
 		}},
 		{"admin wildcard", "Bearer admin", "admin", func(t *testing.T, c *authorization.Claims) {
@@ -101,12 +98,12 @@ func TestAPIKeyClaimMapper_GetClaims_Nones(t *testing.T) {
 
 	// empty token
 	claims, err = mapper.GetClaims(&authorization.AuthInfo{AuthToken: "   "})
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Nil(t, claims)
 
 	// non-bearer scheme should be ignored (let other mappers handle)
 	claims, err = mapper.GetClaims(&authorization.AuthInfo{AuthToken: "Basic abc"})
-	require.NoError(t, err)
+	require.Error(t, err)
 	assert.Nil(t, claims)
 
 	// unknown api key

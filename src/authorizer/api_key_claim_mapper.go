@@ -4,16 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/server/common/authorization"
 	logpkg "go.temporal.io/server/common/log"
-)
-
-const (
-	authorizationBearer = "bearer"
-	permissionRead      = "read"
-	permissionWrite     = "write"
-	permissionWorker    = "worker"
-	permissionAdmin     = "admin"
 )
 
 // apiKeyClaimMapper implements authorization.ClaimMapper only
@@ -34,27 +27,19 @@ func NewAPIKeyClaimMapper(apiKeysString string, logger logpkg.Logger) (authoriza
 
 // GetClaims extracts API key from Authorization header and maps to Claims.
 func (m *apiKeyClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authorization.Claims, error) {
-	if authInfo == nil {
+	if authInfo == nil || authInfo.AuthToken == "" {
 		return nil, nil
 	}
-	raw := strings.TrimSpace(authInfo.AuthToken)
-	if raw == "" {
-		return nil, nil
+	parts := strings.SplitN(authInfo.AuthToken, " ", 2)
+	if len(parts) != 2 {
+		return nil, serviceerror.NewPermissionDenied("unexpected authorization token format", "")
 	}
-
-	token := raw
-	if idx := strings.IndexByte(raw, ' '); idx > 0 {
-		scheme := strings.TrimSpace(raw[:idx])
-		rest := strings.TrimSpace(raw[idx+1:])
-		if strings.EqualFold(scheme, authorizationBearer) {
-			token = rest
-		} else {
-			// Not an API-key scheme; skip so other mappers may handle
-			return nil, nil
-		}
+	if !strings.EqualFold(parts[0], authorizationBearer) {
+		return nil, serviceerror.NewPermissionDenied("unexpected name in authorization token", "")
 	}
+	key := strings.TrimSpace(parts[1])
 
-	if claims, ok := m.keys[token]; ok {
+	if claims, ok := m.keys[key]; ok {
 		return claims, nil
 	}
 	return nil, nil
@@ -92,18 +77,4 @@ func parseAPIKeysString(apiKeysStr string) (map[string]*authorization.Claims, er
 	}
 
 	return keys, nil
-}
-
-func permissionToRole(permission string) authorization.Role {
-	switch strings.ToLower(permission) {
-	case permissionRead:
-		return authorization.RoleReader
-	case permissionWrite:
-		return authorization.RoleWriter
-	case permissionAdmin:
-		return authorization.RoleAdmin
-	case permissionWorker:
-		return authorization.RoleWorker
-	}
-	return authorization.RoleUndefined
 }

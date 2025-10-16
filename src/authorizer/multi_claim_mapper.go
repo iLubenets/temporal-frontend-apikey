@@ -22,7 +22,7 @@ func NewMultiClaimMapper(logger logpkg.Logger) *MultiClaimMapper {
 // Add new claim mapper to the chain
 func (m *MultiClaimMapper) Add(claimMapperName string, claimMapper authorization.ClaimMapper) {
 	m.claimMappers[claimMapperName] = claimMapper
-	m.logger.Info("adding claim mapper", tag.Name(claimMapperName))
+	m.logger.Info("auth: claim-mapper registered", tag.Name(claimMapperName))
 }
 
 // GetClaims converts authorization info of a subject into Temporal claims (permissions) for authorization
@@ -30,16 +30,17 @@ func (m *MultiClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authori
 	for name, cm := range m.claimMappers {
 		claims, err := cm.GetClaims(authInfo)
 		if err != nil {
-			m.logger.Warn(fmt.Sprintf("failed to get claims authInfo:%v", authInfo), tag.Name(name), tag.Error(err))
-			return claims, err
-		}
-		if claims == nil || (claims.System == authorization.RoleUndefined && len(claims.Namespaces) == 0) {
-			m.logger.Info("claim mapper didn't recognize the token", tag.Name(name))
+			m.logger.Warn("auth: claim-mapper error", tag.Name(name), tag.Error(err))
 			continue
 		}
-		m.logger.Info("claim mapper identified the token ", tag.Name(name))
+		if !hasClaims(claims) {
+			m.logger.Debug("auth: claim-mapper skipped: no claims recognized", tag.Name(name))
+			continue
+		}
+		m.logger.Info("auth: claim-mapper selected and permissions identified",
+			tag.Name(name), tag.NewStringTag("claims", fmt.Sprintf("sys:%v,ns:%v", claims.System, claims.Namespaces)))
 		return claims, nil
 	}
-	m.logger.Info("non of claim mappers recognized the token")
+	m.logger.Warn("auth: no claim-mapper recognized the credentials")
 	return &authorization.Claims{}, nil
 }
