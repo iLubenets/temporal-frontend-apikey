@@ -1,7 +1,6 @@
 package authorizer
 
 import (
-	"fmt"
 	"strings"
 
 	"go.temporal.io/server/common/authorization"
@@ -32,10 +31,6 @@ func (m *extraDataJWTClamMapper) GetClaims(authInfo *authorization.AuthInfo) (*a
 		}
 		alt.ExtraData = authToken
 		claims, err := m.defaultJWTClaimMapper.GetClaims(&alt)
-		if err == nil && claims != nil && claims.Subject != "" && claims.System == authorization.RoleUndefined && len(claims.Namespaces) == 0 {
-			m.logger.Warn(fmt.Sprintf("auth: temp workaround - set system permissions for known claim [sub:%s]", claims.Subject))
-			claims.System = authorization.RoleAdmin
-		}
 		return claims, err
 	}
 	return nil, nil

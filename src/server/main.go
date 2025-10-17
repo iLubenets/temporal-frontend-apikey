@@ -50,8 +50,8 @@ func main() {
 		jwtClaimMapper := authorization.NewDefaultJWTClaimMapper(
 			authorization.NewDefaultTokenKeyProvider(&cfg.Global.Authorization, logger), &cfg.Global.Authorization, logger,
 		)
-		claimMappers.Add("extraDataJWTClamMapper", authorizer.NewExtraDataJWTClamMapper(jwtClaimMapper, logger))
 		claimMappers.Add("defaultJWTClaimMapper", jwtClaimMapper)
+		claimMappers.Add("extraDataJWTClamMapper", authorizer.NewExtraDataJWTClamMapper(jwtClaimMapper, logger))
 	}
 
 	s, err := temporal.NewServer(

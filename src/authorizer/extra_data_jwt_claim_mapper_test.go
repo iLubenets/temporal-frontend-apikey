@@ -143,32 +143,6 @@ func TestExtraDataJWTClamMapper_GetClaims_WithBearerLowercase(t *testing.T) {
 	assert.Equal(t, "user789", claims.Subject)
 }
 
-func TestExtraDataJWTClamMapper_GetClaims_SystemAdminWorkaround(t *testing.T) {
-	logger := log.NewTestLogger()
-	// Mock mapper returns claims with subject but no system role and no namespaces
-	mockMapper := &mockClaimMapper{
-		claims: &authorization.Claims{
-			Subject:    "known-user",
-			System:     authorization.RoleUndefined,
-			Namespaces: map[string]authorization.Role{},
-		},
-	}
-	mapper := NewExtraDataJWTClamMapper(mockMapper, logger)
-
-	authInfo := &authorization.AuthInfo{
-		AuthToken: "Bearer original-token",
-		ExtraData: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U",
-	}
-
-	claims, err := mapper.GetClaims(authInfo)
-
-	require.NoError(t, err)
-	require.NotNil(t, claims)
-	assert.Equal(t, "known-user", claims.Subject)
-	// Should apply the workaround and set system to admin
-	assert.Equal(t, authorization.RoleAdmin, claims.System)
-}
-
 func TestExtraDataJWTClamMapper_GetClaims_NoWorkaroundWhenHasNamespaces(t *testing.T) {
 	logger := log.NewTestLogger()
 	mockMapper := &mockClaimMapper{

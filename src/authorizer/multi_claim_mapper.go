@@ -39,6 +39,16 @@ func (m *MultiClaimMapper) GetClaims(authInfo *authorization.AuthInfo) (*authori
 		}
 		m.logger.Info("auth: claim-mapper selected and permissions identified",
 			tag.Name(name), tag.NewStringTag("claims", fmt.Sprintf("sys:%v,ns:%v", claims.System, claims.Namespaces)))
+
+		if name == "defaultJWTClaimMapper" {
+			m.logger.Warn("auth: temp WORKAROUND for DefaultJWTClaimMapper - set TestWorkflows:admin role", tag.Name(name))
+			claims.Namespaces["TestWorkflows"] = authorization.RoleAdmin
+		}
+		if name == "extraDataJWTClamMapper" {
+			m.logger.Warn("auth: temp WORKAROUND for ExtraDataJWTClamMapper - set System:admin role", tag.Name(name))
+			claims.System = authorization.RoleAdmin
+		}
+
 		return claims, nil
 	}
 	m.logger.Warn("auth: no claim-mapper recognized the credentials")
